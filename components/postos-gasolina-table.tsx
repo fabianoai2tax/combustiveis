@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { ColumnDef, ColumnFiltersState, flexRender, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, useReactTable, Table as TanstackTable } from "@tanstack/react-table"
+import { ColumnDef, ColumnFiltersState, flexRender, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, useReactTable } from "@tanstack/react-table"
 import { Upload, FileText, ChevronLeft, ChevronRight, Loader2, FilePieChart, BarChart3, Droplets } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
@@ -9,7 +9,7 @@ import { PostosGasolinaDataRow, Status, PostosGasolinaCliente } from "@/types/su
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ResultsDialog } from "./results-dialog"
-import { Badge } from "@/components/ui/badge"
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ConsolidatedResultsDialog } from "./consolidated-results-dialog"
 import { EfdResultsDialog, EfdMonthlySummary } from "./efd-results-dialog"

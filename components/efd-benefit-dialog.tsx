@@ -1,13 +1,14 @@
 "use client"
 
 import * as React from "react"
+import JSZip from "jszip"
 import { createClient } from "@/lib/supabase/client"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { QuarterlyDetailsDialog } from "./quarterly-details-dialog"
 import type { PostosGasolinaDataRow, EcfProcessedData } from "@/types/supabase"
-import { getSelicRates, calculateSelic, SelicRate } from "@/lib/selic"
+import { getSelicRates, calculateSelic } from "@/lib/selic"
 import { Loader2, Eye } from "lucide-react"
 import { toast } from "sonner"
 
@@ -50,7 +51,7 @@ type EcfRow = {
   tipo_tributacao: string | null
   abertura_receita: AberturaReceita | null
   informacoes_tributos: InformacoesTributos | null
-  recolhimentos_efetuados: Record<string, unknown> | null
+  recolhimentos_efetuados: EcfProcessedData['recolhimentos_efetuados']
   calculo_beneficio: CalculoBeneficio | null
   storage_path?: string | null
 }
@@ -166,8 +167,7 @@ interface EfdBenefitDialogProps {
 
 export function EfdBenefitDialog({ isOpen, onClose, empresa }: EfdBenefitDialogProps) {
   const [isLoading, setIsLoading] = React.useState(false)
-  const [selicRates, setSelicRates] = React.useState<SelicRate[]>([])
-const [rows, setRows] = React.useState<
+  const [rows, setRows] = React.useState<
     Array<{
       exercicio: number
       metodo_apuracao: string | null
@@ -180,7 +180,6 @@ const [rows, setRows] = React.useState<
   const [selected, setSelected] = React.useState<EcfProcessedData | null>(null)
   const [ecfByYear, setEcfByYear] = React.useState<Map<number, EcfRow>>(new Map())
   const [isGenerating, setIsGenerating] = React.useState(false)
-  const [downloads, setDownloads] = React.useState<Array<{ exercicio: number; path: string; url: string | null }>>([])
 
   React.useEffect(() => {
     let cancelled = false
@@ -200,7 +199,6 @@ const [rows, setRows] = React.useState<
         .eq("empresa_id", empresa.empresa_id)
 
       if (cancelled) return
-      setSelicRates(rates || [])
 
       const ecfData = (ecfRes.data || []) as EcfRow[]
       const efdData = (efdRes.data || []) as EfdRow[]
@@ -234,9 +232,9 @@ const out: Array<{
 
         // Monta abertura_receita com receita_revenda vinda da EFD, para exibição
         const periods = isAnual ? ["ANUAL"] : ["1T", "2T", "3T", "4T"]
-        const abertura_receita_num: { [key: string]: number } = {}
+        const abertura_receita_obj: Record<string, { receita_revenda: number }> = {}
         for (const p of periods) {
-          abertura_receita_num[p] = round2(receitaEfdPorPeriodo[p] || 0)
+          abertura_receita_obj[p] = { receita_revenda: round2(receitaEfdPorPeriodo[p] || 0) }
         }
 
         const { calculo } = computeBenefitFromEfd(ecf.metodo_apuracao, receitaEfdPorPeriodo, ecf.informacoes_tributos || {})
@@ -250,7 +248,7 @@ const out: Array<{
           tipo_tributacao: ecf.tipo_tributacao || null,
           metodo_apuracao: ecf.metodo_apuracao || null,
           resultado_tributado: null,
-          abertura_receita: abertura_receita_num,
+          abertura_receita: abertura_receita_obj,
           informacoes_tributos: ecf.informacoes_tributos || {},
           recolhimentos_efetuados: ecf.recolhimentos_efetuados || {},
           calculo_beneficio: calculo,
@@ -296,7 +294,6 @@ const out: Array<{
     try {
       if (!empresa) return
       setIsGenerating(true)
-      setDownloads([])
       const supabase = createClient()
 
       // Arquivos (somente 2020-2024, com storage_path válido)
@@ -380,99 +377,48 @@ const out: Array<{
       if (error) throw error
       if (data?.success) {
         const total = Array.isArray(data.arquivos) ? data.arquivos.length : 0
-        toast.success("Retificadora gerada", { description: `${total} arquivo(s) gerado(s) com sucesso.` })
+        toast.success("Retificadora gerada", { description: `${total} arquivo(s) sendo preparados para download.` })
 
-        // Preferência: baixar automaticamente um único ZIP com todos os TXT
         type RetificadorArquivo = { exercicio?: number; pathRetificador?: string }
-        const arquivos: Array<{ exercicio: number; pathRetificador: string }> = Array.isArray(data.arquivos)
+        const arquivosParaDownload: Array<{ exercicio: number; pathRetificador: string }> = Array.isArray(data.arquivos)
           ? (data.arquivos as RetificadorArquivo[]).map((a) => ({
               exercicio: Number(a.exercicio ?? 0),
               pathRetificador: String(a.pathRetificador ?? "")
-            }))
+            })).filter(a => a.pathRetificador)
           : []
 
-        const paths = arquivos.map((a) => a.pathRetificador).filter(Boolean)
-
-        const zipNameBase = `ECF_RET_${empresa?.nome_empresa || empresa?.empresa_id || "arquivos"}`
-        try {
-          const respZip = await fetch("/api/ecf-ret-zip", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ paths, zipName: zipNameBase }),
-          })
-
-          if (respZip.ok) {
-            const blob = await respZip.blob()
-            const url = URL.createObjectURL(blob)
-            const a = document.createElement("a")
-            a.href = url
-            a.download = `${zipNameBase}.zip`
-            document.body.appendChild(a)
-            a.click()
-            a.remove()
-            URL.revokeObjectURL(url)
-          } else {
-            // Fallback: dispara múltiplos downloads (signed URLs)
-            const signed = await Promise.all(
-              arquivos.map(async (a) => {
-                try {
-                  const resp = await fetch("/api/ecf-ret-download", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ path: a.pathRetificador, expiresIn: 3600 }),
-                  })
-                  const j = await resp.json().catch(() => null)
-                  return { exercicio: a.exercicio, path: a.pathRetificador, url: j?.url || null }
-                } catch {
-                  return { exercicio: a.exercicio, path: a.pathRetificador, url: null }
-                }
-              })
-            )
-
-            // Dispara downloads um-a-um
-            for (const s of signed) {
-              if (s.url) {
-                const name = s.path.split("/").pop() || "arquivo.txt"
-                const link = document.createElement("a")
-                link.href = s.url
-                link.download = name
-                document.body.appendChild(link)
-                link.click()
-                link.remove()
-              }
-            }
-            setDownloads(signed)
-          }
-        } catch {
-          // Fallback em caso de erro no ZIP
-          const signed = await Promise.all(
-            arquivos.map(async (a) => {
-              try {
-                const resp = await fetch("/api/ecf-ret-download", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ path: a.pathRetificador, expiresIn: 3600 }),
-                })
-                const j = await resp.json().catch(() => null)
-                return { exercicio: a.exercicio, path: a.pathRetificador, url: j?.url || null }
-              } catch {
-                return { exercicio: a.exercicio, path: a.pathRetificador, url: null }
-              }
-            })
-          )
-          for (const s of signed) {
-            if (s.url) {
-              const name = s.path.split("/").pop() || "arquivo.txt"
-              const link = document.createElement("a")
-              link.href = s.url
-              link.download = name
-              document.body.appendChild(link)
-              link.click()
-              link.remove()
-            }
-          }
-          setDownloads(signed)
+        if (arquivosParaDownload.length === 0) {
+          toast.info("Nenhum arquivo retificado foi gerado para download.")
+          return
         }
+
+        const zip = new JSZip()
+        const downloadPromises = arquivosParaDownload.map(async (arquivo) => {
+          const { data: blob, error: downloadError } = await supabase.storage
+            .from("ecf-retificadas") // Assuming this is the correct bucket
+            .download(arquivo.pathRetificador)
+          
+          if (downloadError) {
+            throw new Error(`Falha ao baixar o arquivo ${arquivo.pathRetificador}: ${downloadError.message}`)
+          }
+          
+          const fileName = arquivo.pathRetificador.split("/").pop() || `ECF_RET_${arquivo.exercicio}.txt`
+          zip.file(fileName, blob)
+        })
+
+        await Promise.all(downloadPromises)
+
+        const zipBlob = await zip.generateAsync({ type: "blob" })
+        const zipName = `ECF_RET_${empresa?.nome_empresa || empresa?.empresa_id || "arquivos"}.zip`
+
+        const link = document.createElement("a")
+        link.href = URL.createObjectURL(zipBlob)
+        link.download = zipName
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(link.href)
+
       } else {
         throw new Error(data?.error || "Falha desconhecida na geração da retificadora.")
       }
@@ -559,31 +505,6 @@ const out: Array<{
                     )}
                   </Button>
                 </div>
-
-                {downloads.length > 0 && (
-                  <div className="w-full mt-4">
-                    <div className="text-sm font-medium mb-2">Arquivos gerados:</div>
-                    <div className="flex flex-col gap-2">
-                      {downloads.map((d) => (
-                        <div key={d.path} className="flex items-center justify-between border rounded p-2">
-                          <span className="truncate mr-2">ECF {d.exercicio} — {d.path}</span>
-                          {d.url ? (
-                            <a
-                              href={d.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-primary underline whitespace-nowrap"
-                            >
-                              Baixar TXT
-                            </a>
-                          ) : (
-                            <span className="text-muted-foreground whitespace-nowrap">URL indisponível</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </DialogFooter>
             </>
           )}

@@ -50,9 +50,9 @@ export async function saveClienteAndEmpresas(data: SaveClienteParams) {
     revalidatePath("/clientes")
     return { success: true, clienteId: cliente.id }
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Erro na action saveClienteAndEmpresas:", error)
-    return { success: false, error: error.message }
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
   }
 }
 

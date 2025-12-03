@@ -13,6 +13,19 @@ interface RecolhimentosDetailsDialogProps {
   ecfData: EcfProcessedData | null;
 }
 
+interface ResultRow {
+  key: string;
+  beneficio: number;
+  selic: number;
+  total: number;
+  irpjPagoEstimativa: number;
+  irpjPagoDeclaracao: number;
+  csllPagaEstimativa: number;
+  csllPagaDeclaracao: number;
+  irpjTotal: number;
+  csllTotal: number;
+}
+
 export function RecolhimentosDetailsDialog({ isOpen, onClose, ecfData }: RecolhimentosDetailsDialogProps) {
   const [selicRates, setSelicRates] = React.useState<SelicRate[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -31,8 +44,8 @@ export function RecolhimentosDetailsDialog({ isOpen, onClose, ecfData }: Recolhi
     if (!ecfData || !ecfData.calculo_beneficio) return null;
 
     const periodos = Object.keys(ecfData.calculo_beneficio).sort();
-    const results: any[] = [];
-    let annualTotals = {
+    const results: ResultRow[] = [];
+    const annualTotals = {
       beneficio: 0, selic: 0, total: 0, irpjPagoEstimativa: 0, irpjPagoDeclaracao: 0, csllPagaEstimativa: 0, csllPagaDeclaracao: 0, irpjTotal: 0, csllTotal: 0
     };
 

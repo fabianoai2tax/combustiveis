@@ -6,9 +6,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import type { PostosGasolinaDataRow } from "@/types/supabase"
 import { createClient } from "@/lib/supabase/client"
 
+type AberturaReceitaPeriodo = {
+  receita_revenda?: number;
+}
+
 type EcfRow = {
   exercicio: number | null
-  abertura_receita: Record<string, any> | null
+  abertura_receita: Record<string, AberturaReceitaPeriodo> | null
 }
 
 type EfdRow = {

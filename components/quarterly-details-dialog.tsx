@@ -56,8 +56,8 @@ export function QuarterlyDetailsDialog({ isOpen, onClose, ecfData }: QuarterlyDe
   const isAnual = ecfData?.metodo_apuracao?.includes('Anual');
   const dadosReceita = ecfData?.abertura_receita || {}; 
   const dadosOriginais = ecfData?.informacoes_tributos || {}; 
-  const calculos = ecfData?.calculo_beneficio || {};
-  const periodosKeys = Object.keys(calculos).sort();
+  const calculos = React.useMemo(() => ecfData?.calculo_beneficio || {}, [ecfData?.calculo_beneficio]);
+  const periodosKeys = React.useMemo(() => Object.keys(calculos).sort(), [calculos]);
 
   const summaryData = React.useMemo(() => {
     if (!ecfData || !ecfData.calculo_beneficio || selicRates.length === 0) return null;
@@ -125,7 +125,7 @@ export function QuarterlyDetailsDialog({ isOpen, onClose, ecfData }: QuarterlyDe
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-2/5">Descrição</TableHead>
-                    {periodosKeys.map((key, index) => <TableHead key={key} className="text-right">{formatPeriodLabel(key, index)}</TableHead>)}
+                    {periodosKeys.map((key, index) => <TableHead key={key} className="text-right">{formatPeriodLabel(key)}</TableHead>)}
                   </TableRow>
                 </TableHeader>
                 <TableBody>

@@ -1,7 +1,6 @@
 // lib/selic.ts
 
 import { createClient } from "@/lib/supabase/client";
-import { EcfProcessedData } from "@/types/supabase";
 
 // Tipo para a taxa SELIC
 export interface SelicRate {

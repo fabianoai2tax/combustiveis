@@ -25,6 +25,8 @@ const empresaSchema = z.object({
   cnpj_empresa: z.string().min(14, "CNPJ inválido"), // Você pode melhorar a validação de CNPJ depois
 })
 
+type Empresa = z.infer<typeof empresaSchema>
+
 const clienteFormSchema = z.object({
   nome: z.string().min(3, "O nome do cliente deve ter pelo menos 3 letras"),
   empresas: z.array(empresaSchema)
@@ -49,7 +51,7 @@ export function ClienteDialog({ open, onOpenChange, clienteToEdit }: ClienteDial
     },
   })
 
-  const { fields, append, remove, replace } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "empresas",
   })
@@ -72,12 +74,12 @@ export function ClienteDialog({ open, onOpenChange, clienteToEdit }: ClienteDial
             form.reset({
               nome: cliente.nome,
               empresas: empresas && empresas.length > 0 
-                ? empresas.map((e: any) => ({ 
+                ? empresas.map((e: Empresa) => ({ 
                     id: e.id, 
                     // Tenta pegar 'nome_empresa', se não tiver, tenta 'nome', se não, vazio
-                    nome_empresa: e.nome_empresa || e.nome || "", 
+                    nome_empresa: e.nome_empresa || "", 
                     // Tenta pegar 'cnpj_empresa', se não tiver, tenta 'cnpj', se não, vazio
-                    cnpj_empresa: e.cnpj_empresa || e.cnpj || "" 
+                    cnpj_empresa: e.cnpj_empresa || "" 
                   }))
                 : []
             })

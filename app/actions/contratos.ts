@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server" // <--- MUDANÇA: Usando server.ts em vez de admin.ts
+import { PostosGasolinaDataRow, FeeTier } from "@/types/supabase";
 
 // Retorna dados iniciais do contrato do cliente + empresas associadas
 export async function getContratoInitialData(clienteId: string) {
@@ -31,11 +32,11 @@ export async function getContratoInitialData(clienteId: string) {
       return { error: "Erro ao buscar postos de gasolina associados." }
     }
 
-    const companies = (overview || []).filter((row: any) => row.cliente_id === clienteId)
+    const companies = (overview || []).filter((row: PostosGasolinaDataRow) => row.cliente_id === clienteId)
     return { contract, companies }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Unexpected error in getContratoInitialData:", error)
-    return { error: `Um erro inesperado ocorreu: ${error.message}` }
+    return { error: `Um erro inesperado ocorreu: ${error instanceof Error ? error.message : String(error)}` }
   }
 }
 
@@ -43,7 +44,7 @@ export async function getContratoInitialData(clienteId: string) {
 export async function saveContrato(data: {
   client_id: string
   contract_date: string
-  fee_structure: any[]
+  fee_structure: FeeTier[]
 }) {
   try {
     // 1. Cria o cliente com a sessão do usuário
@@ -69,8 +70,8 @@ export async function saveContrato(data: {
     revalidatePath("/clientes") 
     
     return { success: true }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Unexpected error in saveContrato:", error)
-    return { success: false, error: `Um erro inesperado ocorreu: ${error.message}` }
+    return { success: false, error: `Um erro inesperado ocorreu: ${error instanceof Error ? error.message : String(error)}` }
   }
 }

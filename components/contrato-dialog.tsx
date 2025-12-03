@@ -16,7 +16,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
 import {
-  Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage,
+  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -93,7 +93,7 @@ export function ContratoDialog({ open, onOpenChange, cliente }: ContratoDialogPr
     const result = await saveContrato({
       client_id: cliente.id,
       contract_date: format(data.contract_date, 'yyyy-MM-dd'),
-      fee_structure: data.fee_structure,
+      fee_structure: data.fee_structure.map(f => ({ ...f, to: f.to ?? null })),
     });
 
     if (result.success) {

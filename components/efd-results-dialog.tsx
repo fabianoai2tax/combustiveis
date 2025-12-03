@@ -26,8 +26,7 @@ interface EfdResultsDialogProps {
 export function EfdResultsDialog({ isOpen, onClose, empresa, results }: EfdResultsDialogProps) {
   const formatCurrency = (v: number | null | undefined) =>
     v == null ? "N/A" : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v)
-  const formatPercent = (v: number | null | undefined) =>
-    v == null ? "N/A" : `${new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)}%`
+
 
   const totalMeses = React.useMemo(() => {
     return (results || []).reduce(

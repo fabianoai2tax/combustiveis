@@ -18,6 +18,16 @@ interface ResultsDialogProps {
   empresa: PostosGasolinaDataRow | null;
 }
 
+type AberturaReceitaPeriodo = {
+  receita_revenda?: number;
+  receita_bruta?: number;
+};
+
+type CalculoBeneficioPeriodo = {
+  perdaGeradaNoPeriodo?: number;
+  totalRestituirPeriodo?: number;
+}
+
 export function ResultsDialog({ isOpen, onClose, empresa }: ResultsDialogProps) {
   const [isLoading, setIsLoading] = React.useState(false);
   const [ecfData, setEcfData] = React.useState<EcfProcessedData[]>([]);
@@ -25,8 +35,8 @@ export function ResultsDialog({ isOpen, onClose, empresa }: ResultsDialogProps) 
   const [selicRates, setSelicRates] = React.useState<SelicRate[]>([]);
   
   const getReceitaRevendaAnual = (ecf: EcfProcessedData) => {
-  if (!ecf.abertura_receita) return 0;
-  return Object.values(ecf.abertura_receita).reduce((sum, periodo: any) => sum + (periodo.receita_revenda || 0), 0);
+    if (!ecf.abertura_receita) return 0;
+    return Object.values(ecf.abertura_receita).reduce((sum, periodo: AberturaReceitaPeriodo) => sum + (periodo.receita_revenda || 0), 0);
   };
 
   React.useEffect(() => {
@@ -105,10 +115,10 @@ export function ResultsDialog({ isOpen, onClose, empresa }: ResultsDialogProps) 
                     <TableBody>
                       {ecfData.map((ecf) => {
                         const receitaRevenda = getReceitaRevendaAnual(ecf);
-                        const receitaBrutaTotal = Object.values(ecf.abertura_receita || {}).reduce((sum, p: any) => sum + (p.receita_bruta || 0), 0);
+                        const receitaBrutaTotal = Object.values(ecf.abertura_receita || {}).reduce((sum, p: AberturaReceitaPeriodo) => sum + (p.receita_bruta || 0), 0);
                         const isFallback = receitaRevenda === 0 && receitaBrutaTotal > 0;
-                        const perdas = Object.values(ecf.calculo_beneficio || {}).reduce((sum, p: any) => sum + (p.perdaGeradaNoPeriodo || 0), 0);
-                        const beneficioTotalComSelic = Object.entries(ecf.calculo_beneficio || {}).reduce((sum, [key, periodo]: [string, any]) => {
+                        const perdas = Object.values(ecf.calculo_beneficio || {}).reduce((sum, p: CalculoBeneficioPeriodo) => sum + (p.perdaGeradaNoPeriodo || 0), 0);
+                        const beneficioTotalComSelic = Object.entries(ecf.calculo_beneficio || {}).reduce((sum, [key, periodo]: [string, CalculoBeneficioPeriodo]) => {
                           const beneficioPeriodo = periodo.totalRestituirPeriodo || 0;
                           const selicPeriodo = calculateSelic(beneficioPeriodo, key, ecf.exercicio!, selicRates);
                           return sum + beneficioPeriodo + selicPeriodo;
@@ -150,7 +160,7 @@ export function ResultsDialog({ isOpen, onClose, empresa }: ResultsDialogProps) 
               <span className="text-md font-bold text-green-600">
                 {formatCurrency(
                   ecfData.reduce((totalSum, ecf) => {
-                    const beneficioAnualComSelic = Object.entries(ecf.calculo_beneficio || {}).reduce((sum, [key, periodo]: [string, any]) => {
+                    const beneficioAnualComSelic = Object.entries(ecf.calculo_beneficio || {}).reduce((sum, [key, periodo]: [string, CalculoBeneficioPeriodo]) => {
                       const beneficioPeriodo = periodo.totalRestituirPeriodo || 0;
                       const selicPeriodo = calculateSelic(beneficioPeriodo, key, ecf.exercicio!, selicRates);
                       return sum + beneficioPeriodo + selicPeriodo;

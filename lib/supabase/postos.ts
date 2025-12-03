@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import { PostosGasolinaCliente, PostosGasolinaDataRow } from "@/types/supabase";
+import { PostosGasolinaCliente, PostosGasolinaDataRow, PostosGasolinaContrato } from "@/types/supabase";
 
 /**
 * Busca os dados da visão geral de postos de gasolina usando a função RPC do Supabase.
@@ -60,7 +60,7 @@ export async function getPostosGasolinaDataByClientId(clientId: string): Promise
   }
 
   // Filtra os dados no lado do servidor da aplicação, já que a RPC retorna tudo
-  return (data || []).filter(empresa => empresa.cliente_id === clientId);
+  return (data as any[] || []).filter((empresa: any) => empresa.cliente_id === clientId);
 }
 
 export async function getClienteById(clientId: string): Promise<PostosGasolinaCliente | null> {
@@ -79,7 +79,7 @@ export async function getClienteById(clientId: string): Promise<PostosGasolinaCl
   return data;
 }
 
-export async function getContractByClientId(clientId: string): Promise<any | null> {
+export async function getContractByClientId(clientId: string): Promise<PostosGasolinaContrato | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('postos_gasolina_contratos')
@@ -96,7 +96,7 @@ export async function getContractByClientId(clientId: string): Promise<any | nul
   return data;
 }
 
-export async function upsertContract(contractData: any) {
+export async function upsertContract(contractData: Partial<PostosGasolinaContrato>): Promise<PostosGasolinaContrato> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('postos_gasolina_contratos')

@@ -1,10 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
 // 1. Importe o componente da tabela (verifique se o caminho do arquivo está correto)
 import { PostosGasolinaTable } from "@/components/postos-gasolina-table"; 
+import { PostosGasolinaDataRow } from "@/types/supabase";
 
 interface ClientePageProps {
   params: Promise<{ clientId: string }>;
@@ -36,7 +36,7 @@ export default async function ClientePage({ params }: ClientePageProps) {
   const { data: allData } = await supabase.rpc('get_postos_gasolina_overview');
   
   // Filtra as empresas deste cliente específico
-  const postosData = (allData || []).filter((empresa: any) => empresa.cliente_id === clientId);
+  const postosData = (allData || []).filter((empresa: PostosGasolinaDataRow) => empresa.cliente_id === clientId);
 
   // --- BUSCA OPÇÕES DE STATUS ---
   const { data: statusOptions } = await supabase

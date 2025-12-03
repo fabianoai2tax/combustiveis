@@ -39,10 +39,10 @@ export interface EcfProcessedData {
   tipo_tributacao: string | null;
   metodo_apuracao: string | null;
   resultado_tributado: number | null;
-  abertura_receita: { [key: string]: number } | null;
-  informacoes_tributos: { [key: string]: any } | null;
-  recolhimentos_efetuados: { [key: string]: any } | null;
-  calculo_beneficio: { [key: string]: any } | null;
+  abertura_receita: Record<string, { receita_revenda?: number; receita_bruta?: number; [key: string]: number | undefined; }> | null;
+  informacoes_tributos: Record<string, { base_irpj?: number; base_csll?: number; irpj_devido_original?: number; csll_devida_original?: number; }> | null;
+  recolhimentos_efetuados: Record<string, { irpj_estimativas_pagas?: number; irpj_pago_declaracao?: number; csll_estimativas_pagas?: number; csll_paga_declaracao?: number; }> | null;
+  calculo_beneficio: Record<string, { perdaGeradaNoPeriodo?: number; novaBaseCalculoIRPJ?: number; novoIrpjTotal?: number; irpjRestituir?: number; novaBaseCalculoCSLL?: number; novaCsllTotal?: number; csllRestituir?: number; totalRestituirPeriodo?: number; saldoInicialPeriodo?: number; saldoFinalPeriodo?: number; }> | null;
 }
 
 export interface FeeTier {

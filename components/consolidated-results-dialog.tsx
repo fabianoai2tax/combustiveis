@@ -5,7 +5,7 @@
 import * as React from "react"
 import { createClient } from "@/lib/supabase/client"
 import { PostosGasolinaCliente, EcfProcessedData } from "@/types/supabase"
-import { getSelicRates, calculateSelic, SelicRate } from "@/lib/selic"
+import { getSelicRates, calculateSelic } from "@/lib/selic"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Loader2 } from "lucide-react"
@@ -27,10 +27,39 @@ interface ConsolidatedData {
   perdas_nao_utilizadas: number;
 }
 
+interface EmpresaRelacionada {
+  nome: string;
+  cnpj: string;
+  cliente_id: string;
+}
+
+interface DataByEmpresa {
+  [key: string]: {
+    nome_empresa: string;
+    cnpj_empresa: string;
+    ecfs: EcfProcessedData[];
+  }
+}
+
+interface CalculoBeneficioPeriodo {
+  totalRestituirPeriodo?: number;
+}
+
+interface jsPDFWithAutoTable extends jsPDF {
+  lastAutoTable: {
+    finalY: number;
+  };
+}
+
+interface EcfProcessedDataWithSaldo extends EcfProcessedData {
+  saldo_prejuizo_final?: {
+    irpj?: number;
+  }
+}
+
 export function ConsolidatedResultsDialog({ isOpen, onClose, cliente }: ConsolidatedResultsDialogProps) {
   const [isLoading, setIsLoading] = React.useState(false);
   const [consolidatedData, setConsolidatedData] = React.useState<ConsolidatedData[]>([]);
-  const [selicRates, setSelicRates] = React.useState<SelicRate[]>([]);
 
   React.useEffect(() => {
     if (isOpen && cliente) {
@@ -46,8 +75,6 @@ export function ConsolidatedResultsDialog({ isOpen, onClose, cliente }: Consolid
             .eq('postos_gasolina_empresas.cliente_id', cliente.id)
         ]);
 
-        setSelicRates(rates);
-
         if (error) {
           console.error("Erro ao buscar dados consolidados:", error);
           setConsolidatedData([]);
@@ -59,7 +86,7 @@ export function ConsolidatedResultsDialog({ isOpen, onClose, cliente }: Consolid
         const dataByEmpresa = ecfData.reduce((acc, ecf) => {
           
           const empresaId = ecf.empresa_id;
-          const empresaRelacionada = ecf.postos_gasolina_empresas as any;
+          const empresaRelacionada = ecf.postos_gasolina_empresas as EmpresaRelacionada;
 
           if (empresaId && empresaRelacionada) {
             if (!acc[empresaId]) {
@@ -73,9 +100,9 @@ export function ConsolidatedResultsDialog({ isOpen, onClose, cliente }: Consolid
           }
           return acc;
 
-        }, {} as any);
+        }, {} as DataByEmpresa);
 
-        const finalData = Object.values(dataByEmpresa).map((empresa: any) => {
+        const finalData = (Object.values(dataByEmpresa) as Array<{ nome_empresa: string; cnpj_empresa: string; ecfs: EcfProcessedData[]; }>).map((empresa) => {
           
           if (!empresa.ecfs || empresa.ecfs.length === 0) {
             return {
@@ -87,7 +114,7 @@ export function ConsolidatedResultsDialog({ isOpen, onClose, cliente }: Consolid
           }
           
           const total_restituir_corrigido = empresa.ecfs.reduce((totalSum: number, ecf: EcfProcessedData) => {
-            const beneficioAnualComSelic = Object.entries(ecf.calculo_beneficio || {}).reduce((sum, [key, periodo]: [string, any]) => {
+            const beneficioAnualComSelic = Object.entries(ecf.calculo_beneficio || {}).reduce((sum, [key, periodo]: [string, CalculoBeneficioPeriodo]) => {
               const beneficioPeriodo = periodo.totalRestituirPeriodo || 0;
               const selicPeriodo = calculateSelic(beneficioPeriodo, key, ecf.exercicio!, rates);
               return sum + beneficioPeriodo + selicPeriodo;
@@ -96,7 +123,7 @@ export function ConsolidatedResultsDialog({ isOpen, onClose, cliente }: Consolid
           }, 0);
 
           const ultimoExercicio = empresa.ecfs.sort((a: EcfProcessedData, b: EcfProcessedData) => (b.exercicio || 0) - (a.exercicio || 0))[0];
-          const perdas_nao_utilizadas = ultimoExercicio.saldo_prejuizo_final?.irpj || 0;
+          const perdas_nao_utilizadas = (ultimoExercicio as EcfProcessedDataWithSaldo).saldo_prejuizo_final?.irpj || 0;
 
           return {
             nome_empresa: empresa.nome_empresa,
@@ -116,7 +143,7 @@ export function ConsolidatedResultsDialog({ isOpen, onClose, cliente }: Consolid
   const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
   const handleExportPDF = () => {
-    const doc = new jsPDF();
+    const doc = new jsPDF() as jsPDFWithAutoTable;
 
     // Título
     doc.setFontSize(14);
@@ -158,7 +185,7 @@ export function ConsolidatedResultsDialog({ isOpen, onClose, cliente }: Consolid
     });
 
     // Adiciona os totais ao final
-    const finalY = (doc as any).lastAutoTable.finalY || 28;
+    const finalY = doc.lastAutoTable.finalY || 28;
     doc.setFontSize(12);
     doc.text(
       `Total a Recuperar: ${formatCurrency(totalRecuperar)}`,
