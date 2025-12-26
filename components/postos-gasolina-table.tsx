@@ -42,7 +42,7 @@ function ActionsCell({ row }: { row: { original: PostosGasolinaDataRow } }) {
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
-    
+
     setIsUploading(true);
     const supabase = createClient();
     const uploadedFilePaths: string[] = [];
@@ -58,19 +58,38 @@ function ActionsCell({ row }: { row: { original: PostosGasolinaDataRow } }) {
       });
 
       await Promise.all(uploadPromises);
-      toast.success("Upload concluído. Iniciando processamento...");
+      toast.success("Upload concluído. Iniciando processamento em lotes...");
 
-      const { data, error: functionError } = await supabase.functions.invoke('ecf-processor', {
-        body: { empresaId: empresa.empresa_id, filePaths: uploadedFilePaths },
-      });
+      const BATCH_SIZE = 5; // Processa 5 arquivos por vez
+      let allSuccess = true;
+      let finalMessage = "";
 
-      if (functionError) throw functionError;
+      for (let i = 0; i < uploadedFilePaths.length; i += BATCH_SIZE) {
+        const chunk = uploadedFilePaths.slice(i, i + BATCH_SIZE);
+        toast.info(`Processando lote ${i / BATCH_SIZE + 1}...`);
+        
+        const { data, error: functionError } = await supabase.functions.invoke('ecf-processor', {
+          body: { empresaId: empresa.empresa_id, filePaths: chunk },
+        });
 
-      if (data.success) {
-        toast.success("Processamento em Lote Concluído", { description: data.message });
+        if (functionError) {
+          throw functionError; // Lança o erro para ser pego pelo catch
+        }
+
+        if (data.success) {
+          toast.success(`Lote ${i / BATCH_SIZE + 1} concluído: ${data.message}`);
+        } else {
+          allSuccess = false;
+          finalMessage = data.error; // Salva a última mensagem de erro
+          toast.error(`Falha no lote ${i / BATCH_SIZE + 1}`, { description: data.error });
+        }
+      }
+
+      if (allSuccess) {
+        toast.success("Processamento em Lote Concluído", { description: "Todos os arquivos foram processados." });
         window.location.reload();
       } else {
-        throw new Error(data.error);
+        throw new Error(finalMessage || "Um ou mais lotes falharam.");
       }
 
     } catch (e) {
