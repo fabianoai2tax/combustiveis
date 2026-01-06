@@ -33,10 +33,10 @@ export async function saveClienteAndEmpresas(data: SaveClienteParams) {
     // 2. Preparar as empresas com o ID do cliente recém salvo/atualizado
     if (data.empresas.length > 0) {
       const empresasToUpsert = data.empresas.map(empresa => ({
-        id: empresa.id,
+        ...(empresa.id && { id: empresa.id }), // Include id only if it exists
         cliente_id: cliente.id,
-        nome: empresa.nome_empresa, // Corrigido de nome_empresa para nome
-        cnpj: empresa.cnpj_empresa, // Corrigido de cnpj_empresa para cnpj
+        nome: empresa.nome_empresa,
+        cnpj: empresa.cnpj_empresa,
       }))
 
       const { error: empresasError } = await supabase
