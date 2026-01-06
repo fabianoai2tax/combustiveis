@@ -373,62 +373,30 @@ const out: Array<{
         ajustes,
       }
 
-      const { data, error } = await supabase.functions.invoke("ecf-retificador", { body: payload })
+      const { data, error } = await supabase.functions.invoke("ecf-retificadora", { body: payload })
       if (error) throw error
-      if (data?.success) {
-        const total = Array.isArray(data.arquivos) ? data.arquivos.length : 0
-        toast.success("Retificadora gerada", { description: `${total} arquivo(s) sendo preparados para download.` })
+      const blob = new Blob([data], { type: 'application/zip' });
+    const url = window.URL.createObjectURL(blob);
+    
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `RETIFICADORAS_${empresa.nome_empresa || 'ECF'}.zip`;
+    document.body.appendChild(link);
+    link.click();
+    
+    // Cleanup
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
 
-        type RetificadorArquivo = { exercicio?: number; pathRetificador?: string }
-        const arquivosParaDownload: Array<{ exercicio: number; pathRetificador: string }> = Array.isArray(data.arquivos)
-          ? (data.arquivos as RetificadorArquivo[]).map((a) => ({
-              exercicio: Number(a.exercicio ?? 0),
-              pathRetificador: String(a.pathRetificador ?? "")
-            })).filter(a => a.pathRetificador)
-          : []
+    toast.success("Sucesso!", { description: "O download do arquivo ZIP foi iniciado." });
 
-        if (arquivosParaDownload.length === 0) {
-          toast.info("Nenhum arquivo retificado foi gerado para download.")
-          return
-        }
-
-        const zip = new JSZip()
-        const downloadPromises = arquivosParaDownload.map(async (arquivo) => {
-          const { data: blob, error: downloadError } = await supabase.storage
-            .from("ecf-retificadas") // Assuming this is the correct bucket
-            .download(arquivo.pathRetificador)
-          
-          if (downloadError) {
-            throw new Error(`Falha ao baixar o arquivo ${arquivo.pathRetificador}: ${downloadError.message}`)
-          }
-          
-          const fileName = arquivo.pathRetificador.split("/").pop() || `ECF_RET_${arquivo.exercicio}.txt`
-          zip.file(fileName, blob)
-        })
-
-        await Promise.all(downloadPromises)
-
-        const zipBlob = await zip.generateAsync({ type: "blob" })
-        const zipName = `ECF_RET_${empresa?.nome_empresa || empresa?.empresa_id || "arquivos"}.zip`
-
-        const link = document.createElement("a")
-        link.href = URL.createObjectURL(zipBlob)
-        link.download = zipName
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        URL.revokeObjectURL(link.href)
-
-      } else {
-        throw new Error(data?.error || "Falha desconhecida na geração da retificadora.")
-      }
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : String(e)
-      toast.error("Falha na geração da retificadora", { description: message })
-    } finally {
-      setIsGenerating(false)
-    }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    toast.error("Falha na geração", { description: message });
+  } finally {
+    setIsGenerating(false);
   }
+}
 
   return (
     <>
