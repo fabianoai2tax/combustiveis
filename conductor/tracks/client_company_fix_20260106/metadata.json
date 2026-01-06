@@ -1,0 +1,8 @@
+{
+  "track_id": "client_company_fix_20260106",
+  "type": "bug",
+  "status": "new",
+  "created_at": "2026-01-06T12:10:00Z",
+  "updated_at": "2026-01-06T12:10:00Z",
+  "description": "The users currently are unable to acess the companies related to each client (cliente-dialod.tsx) nor create new clients or companies to a client."
+}

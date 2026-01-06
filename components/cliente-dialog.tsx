@@ -73,13 +73,11 @@ export function ClienteDialog({ open, onOpenChange, clienteToEdit }: ClienteDial
 
             form.reset({
               nome: cliente.nome,
-              empresas: empresas && empresas.length > 0 
-                ? empresas.map((e: Empresa) => ({ 
-                    id: e.id, 
-                    // Tenta pegar 'nome_empresa', se não tiver, tenta 'nome', se não, vazio
-                    nome_empresa: e.nome_empresa || "", 
-                    // Tenta pegar 'cnpj_empresa', se não tiver, tenta 'cnpj', se não, vazio
-                    cnpj_empresa: e.cnpj_empresa || "" 
+              empresas: empresas && empresas.length > 0
+                ? empresas.map((e: any) => ({
+                    id: e.id,
+                    nome_empresa: e.nome || "",
+                    cnpj_empresa: e.cnpj || ""
                   }))
                 : []
             })

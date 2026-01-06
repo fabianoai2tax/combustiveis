@@ -4,5 +4,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-## [ ] Track: Create a feature to manage fuel station data, allowing fuel station owners/managers to view, add, edit, and delete information about their fuel stations, including details like location, fuel types available, and pricing.
-*Link: [./conductor/tracks/fuel_station_management_20251226/](./conductor/tracks/fuel_station_management_20251226/)*
+## [~] Track: The users currently are unable to acess the companies related to each client (cliente-dialod.tsx) nor create new clients or companies to a client. Can you help?
+*Link: [./conductor/tracks/client_company_fix_20260106/](./conductor/tracks/client_company_fix_20260106/)*
