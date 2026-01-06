@@ -19,8 +19,8 @@ This plan outlines the steps to fix the bugs related to displaying and saving cl
 
 ## Phase 3: Testing and Verification
 
-- [ ] Task: Manually test the complete user flow.
-    - [ ] Task: Verify that opening the dialog for a client with existing companies correctly displays their names and CNPJs.
-    - [ ] Task: Verify that adding a new company, editing an existing one, and deleting a company all work as expected after saving.
-    - [ ] Task: Verify that changing the client's name is persisted.
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Testing and Verification' (Protocol in workflow.md)
+- [x] Task: Manually test the complete user flow.
+    - [x] Task: Verify that opening the dialog for a client with existing companies correctly displays their names and CNPJs.
+    - [x] Task: Verify that adding a new company, editing an existing one, and deleting a company all work as expected after saving.
+    - [x] Task: Verify that changing the client's name is persisted.
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Testing and Verification' (Protocol in workflow.md) [checkpoint: ee16b35]
