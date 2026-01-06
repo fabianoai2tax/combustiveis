@@ -33,16 +33,16 @@ export async function saveClienteAndEmpresas(data: SaveClienteParams) {
     // 2. Preparar as empresas com o ID do cliente recém salvo/atualizado
     if (data.empresas.length > 0) {
       const empresasToUpsert = data.empresas.map(empresa => ({
-        id: empresa.id, // Mantém o ID se for edição
-        cliente_id: cliente.id, // Vincula ao cliente
-        nome_empresa: empresa.nome_empresa,
-        cnpj_empresa: empresa.cnpj_empresa,
-        // status_id: 1 // Caso precise definir um status padrão
+        id: empresa.id,
+        cliente_id: cliente.id,
+        nome: empresa.nome_empresa, // Corrigido de nome_empresa para nome
+        cnpj: empresa.cnpj_empresa, // Corrigido de cnpj_empresa para cnpj
       }))
 
       const { error: empresasError } = await supabase
         .from('postos_gasolina_empresas')
-        .upsert(empresasToUpsert)
+        .upsert(empresasToUpsert, { onConflict: 'id' }) // Adicionado onConflict
+        .select() // Adicionado select para garantir que o upsert retorne os dados
 
       if (empresasError) throw new Error(`Erro ao salvar empresas: ${empresasError.message}`)
     }
