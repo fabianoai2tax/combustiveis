@@ -13,6 +13,8 @@ This plan outlines the steps to fix the bugs related to displaying and saving cl
 - [x] Task: Update the server action in `app/actions/clientes.ts`. # a8558f8
     - [x] Task: In the `saveClienteAndEmpresas` function, ensure the object being sent to Supabase uses the correct `nome` and `cnpj` field names for the `postos_gasolina_empresas` table. # a8558f8
     - [x] Task: Add the `{ onConflict: 'id' }` option to the `upsert` call for `postos_gasolina_empresas` to ensure updates to existing companies work correctly. # a8558f8
+- [x] Task: Fix bug when adding a new company to an existing client. # c72ad22
+    - [x] Task: In `saveClienteAndEmpresas`, modify the mapping of `empresasToUpsert` to conditionally include the `id` field only when it exists, preventing a `NOT NULL` violation on the primary key for new company insertions. # c72ad22
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Fix Data Persistence' (Protocol in workflow.md)
 
 ## Phase 3: Testing and Verification
