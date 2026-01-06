@@ -4,8 +4,8 @@ This plan outlines the steps to fix the bugs related to displaying and saving cl
 
 ## Phase 1: Fix Data Display in Dialog
 
-- [~] Task: Correct the data mapping in `cliente-dialog.tsx`.
-    - [~] Task: Modify the `form.reset` call inside the `useEffect` hook to correctly map the `nome` and `cnpj` fields from the fetched `empresas` data to the `nome_empresa` and `cnpj_empresa` form fields.
+- [x] Task: Correct the data mapping in `cliente-dialog.tsx`. # fc8e88b
+    - [x] Task: Modify the `form.reset` call inside the `useEffect` hook to correctly map the `nome` and `cnpj` fields from the fetched `empresas` data to the `nome_empresa` and `cnpj_empresa` form fields. # fc8e88b
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Fix Data Display in Dialog' (Protocol in workflow.md)
 
 ## Phase 2: Fix Data Persistence
