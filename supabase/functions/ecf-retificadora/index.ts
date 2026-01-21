@@ -183,13 +183,21 @@ Deno.serve(async (req) => {
 
     if (filesInZip === 0) throw new Error("Nenhum arquivo elegível processado.");
 
-    const zipContent = await zip.generateAsync({ type: "uint8array" });
+    const zipContent = await zip.generateAsync({ 
+      type: "uint8array",
+      compression: "DEFLATE",
+      compressionOptions: { level: 6 },
+    });
+
+    console.log('ZIP gerado com sucesso. Tamanho: ${zipContent.length} bytes.');
 
     return new Response(zipContent, {
+      status: 200,
       headers: {
         ...corsHeaders,
         "Content-Type": "application/zip",
         "Content-Disposition": `attachment; filename="ECF_RETIFICADORAS.zip"`,
+        "Content-Length": zipContent.length.toString(),
       },
     });
 

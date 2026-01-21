@@ -11,6 +11,7 @@ import type { PostosGasolinaDataRow, EcfProcessedData } from "@/types/supabase"
 import { getSelicRates, calculateSelic } from "@/lib/selic"
 import { Loader2, Eye } from "lucide-react"
 import { toast } from "sonner"
+import { resolve } from "path"
 
 type EfdRow = {
   ano_mes: string
@@ -292,9 +293,9 @@ const out: Array<{
 
   async function handleGenerateRetificador() {
     try {
-      if (!empresa) return
-      setIsGenerating(true)
-      const supabase = createClient()
+      if (!empresa) return;
+      setIsGenerating(true);
+      const supabase = createClient();
 
       // Arquivos (somente 2020-2024, com storage_path válido)
       const arquivos = Array.from(ecfByYear.entries())
@@ -374,25 +375,34 @@ const out: Array<{
       }
 
       const { data, error } = await supabase.functions.invoke("ecf-retificadora", { body: payload })
-      if (error) throw error
-      const blob = new Blob([data], { type: 'application/zip' });
-    const url = window.URL.createObjectURL(blob);
-    
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `RETIFICADORAS_${empresa.nome_empresa || 'ECF'}.zip`;
-    document.body.appendChild(link);
-    link.click();
-    
-    // Cleanup
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+      
+      if (error) throw error;
 
-    toast.success("Sucesso!", { description: "O download do arquivo ZIP foi iniciado." });
+      if (data instanceof Blob) {
+      // SUCESSO: data é o arquivo binário ZIP
+      const url = window.URL.createObjectURL(data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `RETIFICADORAS_${empresa.nome_empresa || 'ECF'}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success("Download concluído!");
+    } else {
+      // ERRO: A função retornou um JSON de erro em vez de um Blob
+      // Tipamos o 'data' como um objeto que pode ter a propriedade 'error'
+      const errorData = data as { error?: string; message?: string };
+      const msg = errorData.error || errorData.message || "Erro desconhecido ao gerar ZIP";
+      throw new Error(msg);
+    }
 
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    toast.error("Falha na geração", { description: message });
+  } catch (e: any) {
+    console.error("Erro na geração:", e);
+    toast.error("Falha ao gerar arquivo", { 
+      description: e instanceof Error ? e.message : "Ocorreu um erro inesperado." 
+    });
   } finally {
     setIsGenerating(false);
   }
