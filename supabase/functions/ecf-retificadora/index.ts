@@ -1,7 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7"
 import JSZip from "https://esm.sh/jszip@3.10.1"
 
-// 1. Types
 type AjustePeriodo = {
   exercicio: number
   metodo: "ANUAL" | "TRIMESTRAL"
@@ -23,15 +22,13 @@ type Payload = {
   descricaoAjuste: string
 }
 
-// 2. CORS Configuration (Only declared once)
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Expose-Headers": "Content-Disposition",
+  "Access-Control-Expose-Headers": "Content-Disposition, Content-Length",
 }
 
-// 3. Utility Functions
 const formatNumber = (n: number, sep: "." | ",") => {
   if (!Number.isFinite(n)) n = 0;
   const s = n.toFixed(2);
@@ -59,9 +56,7 @@ function extractPeriodFromFields(fields: string[]): string | null {
   return null;
 }
 
-// 4. Main Processing Logic
 Deno.serve(async (req) => {
-  // Handle CORS Preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -76,8 +71,6 @@ Deno.serve(async (req) => {
     let filesInZip = 0;
 
     for (const arq of payload.arquivos) {
-      console.log(`Processando exercício: ${arq.exercicio}`);
-      
       const { data: fileData, error: dlErr } = await supabaseAdmin.storage
         .from("ecf-uploads")
         .download(arq.filePath);
@@ -94,7 +87,6 @@ Deno.serve(async (req) => {
 
       if (ajustesDoAno.length === 0) continue;
 
-      // Map Ranges
       const mRanges = new Map<string, { start: number; end: number }>();
       const nRanges = new Map<string, { start: number; end: number }>();
       let curM: { p: string; s: number } | null = null;
@@ -116,11 +108,8 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Apply Adjustments
       for (const aj of ajustesDoAno) {
         const pKey = aj.periodo.toUpperCase();
-
-        // Update N (Bases and Tax)
         const nR = nRanges.get(pKey);
         if (nR) {
           for (let i = nR.start; i <= nR.end; i++) {
@@ -138,25 +127,20 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Insert M410/M510
         const mR = mRanges.get(pKey);
         if (mR) {
           const m410 = `|M410|${payload.codAjusteIRPJ}|${payload.descricaoAjuste}|${formatNumber(aj.perdaGeradaNoPeriodo, sep)}|`;
           const m510 = `|M510|${payload.codAjusteCSLL}|${payload.descricaoAjuste}|${formatNumber(aj.perdaGeradaNoPeriodo, sep)}|`;
-          
           let insIdx = mR.end;
           for (let k = mR.start; k <= mR.end; k++) {
             if (lines[k].startsWith("|M415|")) { insIdx = k; break; }
           }
           lines.splice(insIdx, 0, m410, m510);
-          
-          // Offset ranges
           mRanges.forEach(v => { if (v.start > insIdx) { v.start += 2; v.end += 2; } });
           nRanges.forEach(v => { if (v.start > insIdx) { v.start += 2; v.end += 2; } });
         }
       }
 
-      // Final Recalc of Closures
       let c0 = 0, cM = 0, c9 = 0, total = 0;
       for (let i = 0; i < lines.length; i++) {
         const ln = lines[i].trim();
@@ -166,17 +150,15 @@ Deno.serve(async (req) => {
         if (reg.startsWith("0")) c0++;
         if (reg.startsWith("M")) cM++;
         if (reg.startsWith("9")) c9++;
-
         if (reg === "0990") lines[i] = `|0990|${c0}|`;
         if (reg === "M990") lines[i] = `|M990|${cM}|`;
         if (reg === "9990") lines[i] = `|9990|${c9}|`;
         if (reg === "9999") {
           lines[i] = `|9999|${total}|`;
-          lines.length = i + 1; // Truncate anything after 9999
+          lines.length = i + 1;
           break;
         }
       }
-
       zip.file(`${arq.exercicio}-RETIFICADORA.txt`, lines.join("\r\n") + "\r\n");
       filesInZip++;
     }
@@ -186,10 +168,8 @@ Deno.serve(async (req) => {
     const zipContent = await zip.generateAsync({ 
       type: "uint8array",
       compression: "DEFLATE",
-      compressionOptions: { level: 6 },
+      compressionOptions: { level: 6 }
     });
-
-    console.log('ZIP gerado com sucesso. Tamanho: ${zipContent.length} bytes.');
 
     return new Response(zipContent, {
       status: 200,
@@ -202,8 +182,7 @@ Deno.serve(async (req) => {
     });
 
   } catch (err: any) {
-    console.error("ERRO FATAL:", err.message);
-    return new Response(JSON.stringify({ success: false, error: err.message }), {
+    return new Response(JSON.stringify({ error: err.message }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

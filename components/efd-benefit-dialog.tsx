@@ -292,120 +292,89 @@ const out: Array<{
   }, [isOpen, empresa])
 
   async function handleGenerateRetificador() {
-    try {
-      if (!empresa) return;
-      setIsGenerating(true);
-      const supabase = createClient();
+  try {
+    if (!empresa) return;
+    setIsGenerating(true);
+    const supabase = createClient();
 
-      // Arquivos (somente 2020-2024, com storage_path válido)
-      const arquivos = Array.from(ecfByYear.entries())
-        .filter(([year, ecf]) => year >= 2020 && year <= 2024 && !!ecf.storage_path)
-        .map(([year, ecf]) => ({
-          exercicio: year,
-          filePath: String(ecf.storage_path),
-        }))
+    const arquivos = Array.from(ecfByYear.entries())
+      .filter(([year, ecf]) => year >= 2020 && year <= 2024 && !!ecf.storage_path)
+      .map(([year, ecf]) => ({
+        exercicio: year,
+        filePath: String(ecf.storage_path),
+      }));
 
-      // Ajustes por período, derivados dos cálculos já exibidos
-      const ajustes: Array<{
-        exercicio: number
-        metodo: "ANUAL" | "TRIMESTRAL"
-        periodo: "ANUAL" | "1T" | "2T" | "3T" | "4T"
-        perdaGeradaNoPeriodo: number
-        novaBaseIRPJ: number
-        novoIRPJ15: number
-        novoIRPJAdicional: number
-        novaBaseCSLL: number
-        novaCSLLTotal: number
-      }> = []
+    const ajustes: any[] = [];
+    for (const r of rows) {
+      const exercicio = r.exercicio;
+      if (exercicio < 2020 || exercicio > 2024) continue;
+      const metodo = r.metodo_apuracao?.includes("Anual") ? "ANUAL" : "TRIMESTRAL";
+      const calculo = r.synthetic?.calculo_beneficio || {};
+      const isAnual = metodo === "ANUAL";
 
-      for (const r of rows) {
-        const exercicio = r.exercicio
-        if (exercicio < 2020 || exercicio > 2024) continue
-        const metodo: "ANUAL" | "TRIMESTRAL" = r.metodo_apuracao?.includes("Anual") ? "ANUAL" : "TRIMESTRAL"
-        const calculo = (r.synthetic?.calculo_beneficio || {}) as Record<
-          string,
-          {
-            perdaGeradaNoPeriodo?: number
-            novaBaseCalculoIRPJ?: number
-            novoIrpjTotal?: number
-            novaBaseCalculoCSLL?: number
-            novaCsllTotal?: number
-          }
-        >
-        const isAnual = metodo === "ANUAL"
+      for (const [periodo, val] of Object.entries(calculo as any)) {
+        const v = val as any;
+        const baseIR = Math.max(0, Number(v.novaBaseCalculoIRPJ || 0));
+        const limite = isAnual ? 240000 : 60000;
+        const adicionalBase = Math.max(0, baseIR - limite);
 
-        for (const [periodo, val] of Object.entries(calculo)) {
-          const perda = Number(val?.perdaGeradaNoPeriodo || 0)
-          const baseIR = Math.max(0, Number(val?.novaBaseCalculoIRPJ || 0))
-          const baseCS = Math.max(0, Number(val?.novaBaseCalculoCSLL || 0))
-          const limite = isAnual ? 240000 : 60000
-          const adicionalBase = Math.max(0, baseIR - limite)
-          const novoIR15 = round2(baseIR * 0.15)
-          const novoIRAdicional = round2(adicionalBase * 0.10)
-          const novaCSLLTotal = round2(Number(val?.novaCsllTotal || 0))
-
-          ajustes.push({
-            exercicio,
-            metodo,
-            periodo: periodo as 'ANUAL' | '1T' | '2T' | '3T' | '4T',
-            perdaGeradaNoPeriodo: round2(perda),
-            novaBaseIRPJ: round2(baseIR),
-            novoIRPJ15: round2(novoIR15),
-            novoIRPJAdicional: round2(novoIRAdicional),
-            novaBaseCSLL: round2(baseCS),
-            novaCSLLTotal,
-          })
-        }
+        ajustes.push({
+          exercicio,
+          metodo,
+          periodo,
+          perdaGeradaNoPeriodo: round2(Number(v.perdaGeradaNoPeriodo || 0)),
+          novaBaseIRPJ: round2(baseIR),
+          novoIRPJ15: round2(baseIR * 0.15),
+          novoIRPJAdicional: round2(adicionalBase * 0.10),
+          novaBaseCSLL: round2(Math.max(0, Number(v.novaBaseCalculoCSLL || 0))),
+          novaCSLLTotal: round2(Number(v.novaCsllTotal || 0)),
+        });
       }
+    }
 
-      if (arquivos.length === 0 || ajustes.length === 0) {
-        toast.error("Nada a gerar", { description: "Não há arquivos elegíveis (2020–2024) ou ajustes calculados." })
-        setIsGenerating(false)
-        return
-      }
+    if (arquivos.length === 0 || ajustes.length === 0) {
+      toast.error("Nada a gerar", { description: "Não há arquivos elegíveis ou ajustes calculados." });
+      return;
+    }
 
-      const payload = {
+    const { data, error } = await supabase.functions.invoke("ecf-retificadora", {
+      body: {
         empresaId: empresa.empresa_id,
         arquivos,
-        consolidadoPorPeriodo: true,
+        ajustes,
         codAjusteIRPJ: "900",
         codAjusteCSLL: "900",
         descricaoAjuste: "Perda por Evaporação",
-        ajustes,
-      }
+      },
+    });
 
-      const { data, error } = await supabase.functions.invoke("ecf-retificadora", { body: payload })
-      
-      if (error) throw error;
+    if (error) throw error;
 
-      if (data instanceof Blob) {
-      // SUCESSO: data é o arquivo binário ZIP
-      const url = window.URL.createObjectURL(data);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `RETIFICADORAS_${empresa.nome_empresa || 'ECF'}.zip`;
-      document.body.appendChild(link);
-      link.click();
-      
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      toast.success("Download concluído!");
-    } else {
-      // ERRO: A função retornou um JSON de erro em vez de um Blob
-      // Tipamos o 'data' como um objeto que pode ter a propriedade 'error'
-      const errorData = data as { error?: string; message?: string };
-      const msg = errorData.error || errorData.message || "Erro desconhecido ao gerar ZIP";
-      throw new Error(msg);
+    // Se a função retornou erro (JSON) em vez de ZIP (Blob)
+    if (!(data instanceof Blob)) {
+      const errorData = data as { error?: string };
+      throw new Error(errorData.error || "Erro ao processar arquivos no servidor.");
     }
+
+    // Sucesso: Criar link de download para o ZIP
+    const url = window.URL.createObjectURL(data);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `RETIFICADORAS_${empresa.nome_empresa || 'ECF'}.zip`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    toast.success("Sucesso!", { description: "O download dos arquivos retificados foi iniciado." });
 
   } catch (e: any) {
     console.error("Erro na geração:", e);
-    toast.error("Falha ao gerar arquivo", { 
-      description: e instanceof Error ? e.message : "Ocorreu um erro inesperado." 
-    });
+    toast.error("Falha na geração", { description: e.message || "Erro inesperado." });
   } finally {
     setIsGenerating(false);
   }
+
 }
 
   return (
