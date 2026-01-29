@@ -63,6 +63,11 @@ Deno.serve(async (req) => {
 
   try {
     const payload = (await req.json()) as Payload;
+    console.log("Payload recebido:", JSON.stringify(payload));
+
+    const { empresaId, arquivos, ajustes, codAjusteIRPJ, codAjusteCSLL, descricaoAjuste } = payload;
+    if (!arquivos || arquivos.length === 0) throw new Error("A lista de arquivos está vazia.");
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
@@ -70,27 +75,28 @@ Deno.serve(async (req) => {
     const zip = new JSZip();
     let filesInZip = 0;
 
-    for (const arq of payload.arquivos) {
+    for (const arq of arquivos) {
+      console.log(`Iniciando processamento do ano: ${arq.exercicio}`);
+      
       const { data: fileData, error: dlErr } = await supabaseAdmin.storage
         .from("ecf-uploads")
         .download(arq.filePath);
 
       if (dlErr) {
-        console.error(`Erro download: ${arq.filePath}`, dlErr);
+        console.error(`Erro ao baixar arquivo ${arq.filePath}:`, dlErr);
         continue;
       }
 
       const fileContent = await fileData.text();
-      let lines = fileContent.split(/\r?\n/);
-      const sep = detectDecimalSeparator(lines);
-      const ajustesDoAno = payload.ajustes.filter(a => a.exercicio === arq.exercicio);
+      const lines = fileContent.split(/\r?\n/);
+      
+      // Filtro robusto: garante que comparamos números com números
+      const ajustesDoAno = ajustes.filter((a: any) => Number(a.exercicio) === Number(arq.exercicio));
 
-      if (ajustesDoAno.length === 0) continue;
-
-      const mRanges = new Map<string, { start: number; end: number }>();
-      const nRanges = new Map<string, { start: number; end: number }>();
-      let curM: { p: string; s: number } | null = null;
-      let curN: { p: string; s: number } | null = null;
+      if (ajustesDoAno.length === 0) {
+        console.warn(`Nenhum ajuste encontrado para o ano ${arq.exercicio}. Pulando.`);
+        continue;
+      }
 
       for (let i = 0; i < lines.length; i++) {
         const parts = lines[i].split("|");
@@ -159,17 +165,22 @@ Deno.serve(async (req) => {
           break;
         }
       }
+      
       zip.file(`${arq.exercicio}-RETIFICADORA.txt`, lines.join("\r\n") + "\r\n");
       filesInZip++;
     }
 
-    if (filesInZip === 0) throw new Error("Nenhum arquivo elegível processado.");
+    if (filesInZip === 0) {
+      throw new Error("O processamento terminou, mas nenhum arquivo foi adicionado ao ZIP. Verifique se os anos dos ajustes coincidem com os anos dos arquivos.");
+    }
 
     const zipContent = await zip.generateAsync({ 
       type: "uint8array",
       compression: "DEFLATE",
       compressionOptions: { level: 6 }
     });
+
+    console.log(`ZIP concluído: ${filesInZip} arquivos, ${zipContent.length} bytes.`);
 
     return new Response(zipContent, {
       status: 200,
@@ -182,8 +193,9 @@ Deno.serve(async (req) => {
     });
 
   } catch (err: any) {
+    console.error("ERRO NA FUNÇÃO:", err.message);
     return new Response(JSON.stringify({ error: err.message }), {
-      status: 400,
+      status: 400, // Retornamos 400 para erros de validação/dados
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

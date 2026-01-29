@@ -297,66 +297,66 @@ const out: Array<{
     setIsGenerating(true);
     const supabase = createClient();
 
+    // 1. Mapear arquivos
     const arquivos = Array.from(ecfByYear.entries())
       .filter(([year, ecf]) => year >= 2020 && year <= 2024 && !!ecf.storage_path)
       .map(([year, ecf]) => ({
-        exercicio: year,
+        exercicio: Number(year),
         filePath: String(ecf.storage_path),
       }));
 
+    // 2. Mapear ajustes
     const ajustes: any[] = [];
-    for (const r of rows) {
-      const exercicio = r.exercicio;
-      if (exercicio < 2020 || exercicio > 2024) continue;
-      const metodo = r.metodo_apuracao?.includes("Anual") ? "ANUAL" : "TRIMESTRAL";
+    rows.forEach((r) => {
+      const year = Number(r.exercicio);
+      if (year < 2020 || year > 2024) return;
+      
       const calculo = r.synthetic?.calculo_beneficio || {};
-      const isAnual = metodo === "ANUAL";
+      const isAnual = r.metodo_apuracao?.includes("Anual");
 
-      for (const [periodo, val] of Object.entries(calculo as any)) {
-        const v = val as any;
-        const baseIR = Math.max(0, Number(v.novaBaseCalculoIRPJ || 0));
+      Object.entries(calculo).forEach(([periodo, val]: [string, any]) => {
+        const baseIR = Math.max(0, Number(val.novaBaseCalculoIRPJ || 0));
         const limite = isAnual ? 240000 : 60000;
         const adicionalBase = Math.max(0, baseIR - limite);
 
         ajustes.push({
-          exercicio,
-          metodo,
-          periodo,
-          perdaGeradaNoPeriodo: round2(Number(v.perdaGeradaNoPeriodo || 0)),
+          exercicio: year,
+          periodo: periodo,
+          perdaGeradaNoPeriodo: round2(Number(val.perdaGeradaNoPeriodo || 0)),
           novaBaseIRPJ: round2(baseIR),
           novoIRPJ15: round2(baseIR * 0.15),
           novoIRPJAdicional: round2(adicionalBase * 0.10),
-          novaBaseCSLL: round2(Math.max(0, Number(v.novaBaseCalculoCSLL || 0))),
-          novaCSLLTotal: round2(Number(v.novaCsllTotal || 0)),
+          novaBaseCSLL: round2(Math.max(0, Number(val.novaBaseCalculoCSLL || 0))),
+          novaCSLLTotal: round2(Number(val.novaCsllTotal || 0)),
         });
-      }
-    }
+      });
+    });
 
-    if (arquivos.length === 0 || ajustes.length === 0) {
-      toast.error("Nada a gerar", { description: "Não há arquivos elegíveis ou ajustes calculados." });
-      return;
-    }
+    const payload = {
+      empresaId: empresa.empresa_id,
+      arquivos,
+      ajustes,
+      codAjusteIRPJ: "900",
+      codAjusteCSLL: "900",
+      descricaoAjuste: "Perda por Evaporação",
+    };
 
+    console.log("Enviando payload para Edge Function:", payload);
+
+    // 3. Chamada da função
     const { data, error } = await supabase.functions.invoke("ecf-retificadora", {
-      body: {
-        empresaId: empresa.empresa_id,
-        arquivos,
-        ajustes,
-        codAjusteIRPJ: "900",
-        codAjusteCSLL: "900",
-        descricaoAjuste: "Perda por Evaporação",
-      },
+      body: payload,
     });
 
     if (error) throw error;
 
-    // Se a função retornou erro (JSON) em vez de ZIP (Blob)
+    // Se o retorno não for um Blob, a função provavelmente retornou um JSON de erro
     if (!(data instanceof Blob)) {
-      const errorData = data as { error?: string };
-      throw new Error(errorData.error || "Erro ao processar arquivos no servidor.");
+      const errorMsg = (data as any)?.error || "Erro desconhecido no servidor.";
+      throw new Error(errorMsg);
     }
 
-    // Sucesso: Criar link de download para o ZIP
+    // 4. Download do ZIP
     const url = window.URL.createObjectURL(data);
     const link = document.createElement("a");
     link.href = url;
@@ -366,15 +366,14 @@ const out: Array<{
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
 
-    toast.success("Sucesso!", { description: "O download dos arquivos retificados foi iniciado." });
+    toast.success("Sucesso!", { description: "Download iniciado." });
 
   } catch (e: any) {
-    console.error("Erro na geração:", e);
+    console.error("Erro completo:", e);
     toast.error("Falha na geração", { description: e.message || "Erro inesperado." });
   } finally {
     setIsGenerating(false);
   }
-
 }
 
   return (
