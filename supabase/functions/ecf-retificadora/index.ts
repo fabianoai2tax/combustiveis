@@ -89,6 +89,11 @@ Deno.serve(async (req) => {
 
       const fileContent = await fileData.text();
       const lines = fileContent.split(/\r?\n/);
+      const sep = detectDecimalSeparator(lines);
+      const mRanges = new Map<string, { start: number; end: number }>();
+      const nRanges = new Map<string, { start: number; end: number }>();
+      let curM: { p: string; s: number } | null = null;
+      let curN: { p: string; s: number } | null = null;
       
       // Filtro robusto: garante que comparamos números com números
       const ajustesDoAno = ajustes.filter((a: any) => Number(a.exercicio) === Number(arq.exercicio));
@@ -186,7 +191,8 @@ Deno.serve(async (req) => {
       status: 200,
       headers: {
         ...corsHeaders,
-        "Content-Type": "application/zip",
+        // Use octet-stream para o supabase-js tratar o retorno como Blob automaticamente
+        "Content-Type": "application/octet-stream",
         "Content-Disposition": `attachment; filename="ECF_RETIFICADORAS.zip"`,
         "Content-Length": zipContent.length.toString(),
       },

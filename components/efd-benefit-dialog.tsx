@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import JSZip from "jszip"
 import { createClient } from "@/lib/supabase/client"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -11,7 +10,6 @@ import type { PostosGasolinaDataRow, EcfProcessedData } from "@/types/supabase"
 import { getSelicRates, calculateSelic } from "@/lib/selic"
 import { Loader2, Eye } from "lucide-react"
 import { toast } from "sonner"
-import { resolve } from "path"
 
 type EfdRow = {
   ano_mes: string
@@ -350,10 +348,10 @@ const out: Array<{
 
     if (error) throw error;
 
-    // Se o retorno não for um Blob, a função provavelmente retornou um JSON de erro
-    if (!(data instanceof Blob)) {
-      const errorMsg = (data as any)?.error || "Erro desconhecido no servidor.";
-      throw new Error(errorMsg);
+    // A edge function retorna application/octet-stream, ent e3o o supabase-js deve devolver Blob.
+    if (!(data instanceof Blob) || data.size === 0) {
+      const maybeText = typeof data === "string" ? data : null;
+      throw new Error(maybeText || (data as any)?.error || "Erro desconhecido no servidor.");
     }
 
     // 4. Download do ZIP
